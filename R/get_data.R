@@ -5,46 +5,38 @@ library(magrittr)
 library(ggplot2)
 library(xlsx)
 library(tibble)
+library(haven)
 
 # can be tricky to install. requires sudo apt-get install libgdal1-dev libproj-dev
 library(rgdal) 
 
 # get election results data from HOC library website
-url <- paste0("http://researchbriefings.files.parliament.uk/",
-              "documents/CBP-7979/hocl-ge2017-results-full.csv")
+url <- paste0("http://www.britishelectionstudy.com/wp-content/uploads/2017/",
+              "07/BES-2017-General-Election-results-file-v1.0.dta")
 
-dest_path <- "data/GE2017_results.csv"
+dest_path <- file.path("data/GE2017_results.dta")
 
-curl_download(url=url,destfile = dest_path)
+curl_download(url=url, destfile = dest_path)
+
+results_df <- haven::read_dta(file = dest_path)
 
 results_df <- read.csv(dest_path,stringsAsFactors = F)
 
-#  find the winner in each seat
-winners_df <- results_df %>% group_by(ons_id) %>% filter(share==max(share))
 
-# party name splits out lab/co-operative and lab seperately, although in 
-# practice they are one party
-
-winners_df <- winners_df %>% 
-  mutate(party_name = ifelse(party_name == "Labour and Co-operative", 
-                             "Labour", party_name))
 # results
-winners_df %>% group_by(party_name) %>% summarise(Seats=n()) %>% arrange(-Seats)
+results_df %>% group_by(Winner17) %>% summarise(Seats=n()) %>% arrange(-Seats)
 
-# apply this recode to the full df also
-results_df <- results_df %>% 
-  mutate(party_name = ifelse(party_name == "Labour and Co-operative", 
-                             "Labour", party_name))
+results_df %<>% mutate(Winner17=as_factor(Winner17))
 # set traditional party colours
 
-parties <- winners_df %>% ungroup() %>%  select(party_name) %>% unique()
-parties
+parties <- results_df %>%  select(Winner17) %>% unique() 
+
 party_colours <- c("red", "blue", "yellow", "darkgreen","orange",
-             "purple", "lightgreen", "green","black","grey")
-party_colours <- setNames(party_colours, parties$party_name)
+                   "green","black")
+party_colours <- setNames(party_colours, parties$Winner17)
 
 # share vs change
-ggplot(winners_df, aes(x=share,y=change, colour=party_name)) + geom_point() + 
+ggplot(results_df, aes(x=share,y=change, colour=party_name)) + geom_point() + 
   scale_colour_manual(values=party_colours)
 
 # incumbent
