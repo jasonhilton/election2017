@@ -10,7 +10,7 @@ library(haven)
 # can be tricky to install. requires sudo apt-get install libgdal1-dev libproj-dev
 library(rgdal) 
 
-# get election results data from HOC library website
+# get election results data from BES website
 url <- paste0("http://www.britishelectionstudy.com/wp-content/uploads/2017/",
               "07/BES-2017-General-Election-results-file-v1.0.dta")
 
@@ -20,24 +20,31 @@ curl_download(url=url, destfile = dest_path)
 
 results_df <- haven::read_dta(file = dest_path)
 
-results_df <- read.csv(dest_path,stringsAsFactors = F)
 
 
 # results
-results_df %>% group_by(Winner17) %>% summarise(Seats=n()) %>% arrange(-Seats)
+
 
 results_df %<>% mutate(Winner17=as_factor(Winner17))
-# set traditional party colours
+results_df %>% group_by(Winner17) %>% summarise(Seats=n()) %>% arrange(-Seats)
 
+# set traditional party colours
 parties <- results_df %>%  select(Winner17) %>% unique() 
 
-party_colours <- c("red", "blue", "yellow", "darkgreen","orange",
+party_colours <- c( "blue", "red", "yellow", "orange","darkgreen",
                    "green","black")
 party_colours <- setNames(party_colours, parties$Winner17)
 
 # share vs change
-ggplot(results_df, aes(x=share,y=change, colour=party_name)) + geom_point() + 
-  scale_colour_manual(values=party_colours)
+ggplot(results_df , aes(x=Lab17,y=Lab1517)) + geom_point(colour="red") +
+  theme_minimal()
+ggplot(results_df , aes(x=Con17,y=Con17 - Con15),colour="blue") + geom_point()
+
+party_prefixs <- c("Con","Lab", "SNP", "LD", "PC", "Green", "UKIP", "Other")
+nice_variables <-   c("ONSConstID", "ConstituencyName",
+                      "Country",  "Region", "ConstituencyType",
+                      "Winner17") 
+share_df <- results_df %>% select(paste0(party_prefixs, 17), nice_variables)
 
 # incumbent
 ggplot(results_df %>% filter(party_name %in% c("Labour","Conservative")), 
@@ -75,8 +82,14 @@ write.csv(pop_constituency_df,file=file.path("data","const_pop.csv"))
 
 # constituency maps
 dir.create(file.path("data","mapping"))
-url <- paste0("http://geoportal.statistics.gov.uk/datasets/",
-              "b0f309e493cf4b9ba0d343eebb97b5ee_3.geojson")
-dest_file <- file.path("data", "mapping", "constituency.geojson")
+
+url <- paste0("https://opendata.arcgis.com/datasets/",
+              "5c582cef61d04618928639dd17e4f896_4.zip?",
+              "outSR=%7B%22wkid%22%3A4326%2C%22latestWkid%22%3A4326%7D")
+dest_file <- file.path("data", "mapping", "constituency.zip")
 curl_download(url, destfile = dest_file )
-const <-readOGR(dest_file , "OGRGeoJSON")
+unzip(dest_file, exdir = "data/mapping")
+shape_file_name <- list.files(file.path("data", "mapping"), pattern="*.shp")
+const <-readOGR(file.path("data", "mapping",shape_file_name),stringsAsFactors = F)
+
+
