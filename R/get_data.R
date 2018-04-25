@@ -93,3 +93,5 @@ shape_file_name <- list.files(file.path("data", "mapping"), pattern="*.shp")
 const <-readOGR(file.path("data", "mapping",shape_file_name),stringsAsFactors = F)
 
 
+bbc_EU_ward_results_url <- paste0("https://3859gp38qzh51h504x6gvv0o-wpengine.netdna-ssl.com/",
+                                  "files/2017/02/ward-results.xlsx")

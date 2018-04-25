@@ -1,0 +1,16 @@
+---
+title: "Examining Spatial Effects in the UK election using Bayesian Models"
+author: "Jason Hilton"
+date: "25 April 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+The result of the 2017 election produced somewhat different results than had been predicted by pollsters, with the notable exception of the work done by Ben Lauderdale and Yougov. Patterns of voting across age and space shifted somewhat from previous elections, with Labour performing strongly in the urban areas, but less well in local areas. 
+
+Spatial models 
