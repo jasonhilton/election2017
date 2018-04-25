@@ -3,6 +3,7 @@ title: "Examining Spatial Effects in the UK election using Bayesian Models"
 author: "Jason Hilton"
 date: "25 April 2018"
 output: pdf_document
+bibliography: election.bib
 ---
 
 ```{r setup, include=FALSE}
@@ -11,6 +12,45 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Introduction
 
-The result of the 2017 election produced somewhat different results than had been predicted by pollsters, with the notable exception of the work done by Ben Lauderdale and Yougov. Patterns of voting across age and space shifted somewhat from previous elections, with Labour performing strongly in the urban areas, but less well in local areas. 
+The result of the 2017 election produced somewhat different results than had been predicted by polling companies, with the notable exception  of the work done by Ben Lauderdale and Yougov [@Lauderdale2017]. Patterns of voting across age and space shifted somewhat from previous elections, with Labour performing strongly in metropolitan areas, but less well in more traditional working-class areas in the north. 
 
-Spatial models 
+This paper looks to examine spatial patterns in the results of recent British election  using Bayesian conditional auto-regressive modelling. Integrated Nested Laplace Approximations are used to fit Besag-type models to predict counts of votes for the main parties, considering the registered electorate as the relevant exposure to risk [@Blangiardo2015]. 
+
+# Motivation for Spatial Modelling
+Historians have suggested that the geographical pattern of party political affiliation has long antecedents in the history of religious non-conformism and in England's industrial history [@Tombs2015]. Such patterns may not be captured in easily available covariates, and so in statistical modelling we might expect it be captured in a spatially structured residual.
+
+![Figure 1: Labour Vote](../Labour_vote.pdf)
+
+Various different spatial models could be fitted [@Blangiardo2015], but given that the data we are provided with corresponds to distinct areas, a model that focuses on neighbourhood relations between spatial units rather than distances seems appropriate.
+
+# Methodology
+Conditional auto-regressive models impose a neighbourhood structure upon spatial units, and then consider each unit independent of all others *given the values of its neighbours*. In the case of election results, we can easily define neighbours of a given constituency as those with which it shares a border.
+
+A poisson likelihood on the vote total for each party is assumed, with exposures defined as the registered electorate. Data on constituency results and characteristics from the British Election Study (BES) (http://www.britishelectionstudy.com) was used for fitting the model. Relevant covariates based on 2011 census data are included in the BES dataset; future work will update these with more recent alternatives. 
+
+The model follows that given in @Blangiardo2015:
+$$
+\begin{aligned}
+y_i &\sim \text{Poisson}(E_i\lambda_i) \\
+log(\lambda_i) &= \eta_i =  X_i\beta + u_i + v_i \\
+v_i & \sim \text{Normal}(0, \sigma_v) \\
+\pmb{u} & \sim \text{MVN}(\pmb{0}, \pmb{\Sigma})
+\end{aligned}
+$$
+where $y_i$ is the total absolute vote in constituency $i$,  $v_i$ are i.i.d. errors, $E_i$ is the relevant registered electorate, and $Sigma$ is a covariance matrix that includes the neighbourhood structure of the constituencies.
+
+![Spatial errors, model 1](../model_1.pdf)
+
+# Preliminary Results
+Comparing the vote for the Labour party with the structured errors remaining after covariants have been added to the model indentifies regions in which the Labour vote is higher than might be expected. The first model controls only for the population size of a selection of age groups. The second model includes additional various social and economic controls, include house ownership, deprivation, and degree attainment. In both models, similar areas are identified as being more likely to vote Labour than expected given the covariates models. In particular, the areas around Liverpool and South Wales are noticeable, together with regions in Kent and Suffolk.
+
+![Spatial errors, model 2](../model_2.pdf)
+
+# Extensions
+Future work will include modelling other parties' vote, and the joint modelling of all parties' vote and non-voting using a multinomial framework. Proper description of the uncertainties in predictive distributions together with model checking will also be carried out. Temporal differences over several elections will also be examined.
+
+# References
+
+
+
+
