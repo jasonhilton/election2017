@@ -57,6 +57,7 @@ url <- paste0("https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/",
               "parliamentaryconstituencymidyearpopulationestimates/",
               "mid2015sape18dt7/sape18dt7mid2015parliconsyoaestimates.zip")
 
+dir.create("data")
 dest_file <- "data/constituency_pop.zip"
 curl_download(url, dest_file)
 unzip(dest_file, exdir="data")
@@ -95,3 +96,6 @@ const <-readOGR(file.path("data", "mapping",shape_file_name),stringsAsFactors = 
 
 bbc_EU_ward_results_url <- paste0("https://3859gp38qzh51h504x6gvv0o-wpengine.netdna-ssl.com/",
                                   "files/2017/02/ward-results.xlsx")
+
+eu_df <- read.xlsx("data/eu_ward_level.xlsx",sheetIndex = 1)
+
