@@ -8,11 +8,15 @@ library(INLA)
 library(tidyr)
 library(dplyr)
 library(magrittr)
+library(purrr)
 library(ggplot2)
 
 library(tibble)
 library(haven)
 library(rgdal) 
+library(spdep)
+
+source("R/utility.R")
 
 shape_file_name <- list.files(file.path("data", "mapping"), 
                               pattern="*.shp")
@@ -153,3 +157,17 @@ ggplot(results_df) +
         axis.text = element_blank(),
         axis.ticks = element_blank()
   )
+
+
+---
+  
+centr <- gCentroid(map_df, byid = TRUE)
+
+# create SpatialPointsDataFrame to export via writeOGR
+# positive side effect: All data from landuse@data joined to centr@data
+centr <- SpatialPointsDataFrame(centr, data= landuse@data) 
+
+
+
+
+
