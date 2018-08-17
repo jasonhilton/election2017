@@ -55,22 +55,43 @@ ggplot(results_df %>% filter(party_name %in% c("Labour","Conservative")),
 url <- paste0("https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/",
               "populationandmigration/populationestimates/datasets/",
               "parliamentaryconstituencymidyearpopulationestimates/",
-              "mid2015sape18dt7/sape18dt7mid2015parliconsyoaestimates.zip")
+              "mid2016sape19dt7/",
+              "sape19dt7mid2016parliconsyoaestimatesunformatted.zip")
 
 dir.create("data")
 dest_file <- "data/constituency_pop.zip"
 curl_download(url, dest_file)
 unzip(dest_file, exdir="data")
 
+# sheets
+# 2 both sexes
+# 3 males
+# 4 females
 pop_constituency <- read.xlsx(file.path("data",
-                              "SAPE18DT7-mid-2015-parlicon-syoa-estimates.xls"),
-                              sheetIndex = 2,startRow = 4)
+                              "SAPE19DT7-mid-2016-parlicon-syoa-estimates-unformatted.xls"),
+                              sheetIndex = 2,startRow = 5)
+
+pop_constituency_m <- read.xlsx(file.path("data",
+                                        "SAPE19DT7-mid-2016-parlicon-syoa-estimates-unformatted.xls"),
+                              sheetIndex = 3,startRow = 5)
+
+pop_constituency_f <- read.xlsx(file.path("data",
+                                          "SAPE19DT7-mid-2016-parlicon-syoa-estimates-unformatted.xls"),
+                                sheetIndex = 4,startRow = 5)
+
+
+pop_constituency %<>% rbind(pop_constituency %>% mutate(Sex="Total"),
+                           pop_constituency_m %>% mutate(Sex="Male"),
+                           pop_constituency_f %>% mutate(Sex="Female"))
+
 
 # tidy data format
 pop_constituency_df <- pop_constituency %>% as_tibble() %>% 
-  rename(ons_id=PCON11CD,constituency_name=PCON11NM) %>%
-  gather(key=Age,value=Population, -ons_id,-constituency_name, -All.Ages) %>%
-  mutate(Age = as.numeric(gsub("X","", Age)))
+  rename(ons_id=PCON11CD,constituency_name=PCON11NM) %>% 
+  arrange(ons_id)
+
+#  gather(key=Age,value=Population, -ons_id,-constituency_name, -All.Ages,-Sex) %>%
+#  mutate(Age = as.numeric(gsub("X","", Age)))
     
 pop_constituency_df 
 
@@ -98,4 +119,9 @@ bbc_EU_ward_results_url <- paste0("https://3859gp38qzh51h504x6gvv0o-wpengine.net
                                   "files/2017/02/ward-results.xlsx")
 
 eu_df <- read.xlsx("data/eu_ward_level.xlsx",sheetIndex = 1)
+
+# deaths
+
+
+
 

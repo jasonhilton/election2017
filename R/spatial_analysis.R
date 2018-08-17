@@ -159,7 +159,7 @@ ggplot(results_df) +
   )
 
 
----
+#---
   
 centr <- gCentroid(map_df, byid = TRUE)
 
