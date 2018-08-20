@@ -74,4 +74,15 @@ commonwealth_countries <- c(
 # Source:
 # https://www.tendringdc.gov.uk/council/elections-voting/list-commonwealth-countries-voting-rights
 
-
+plot_matrix <- function(sample_mat, plot_dim =c("columns","rows"), add=F, ...){
+  plot_dim <- match.arg(plot_dim)
+  if (plot_dim == "rows"){
+    sample_mat <- t(sample_mat)
+  }
+  
+  iters <- 1:ncol(sample_mat)
+  if (!add){
+    plot(sample_mat[,1], ylim=range(sample_mat), type="l", ...)  
+  }
+  rubbish<-lapply(iters, function(j) points(sample_mat[,j], type="l", ...))
+}

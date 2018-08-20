@@ -164,6 +164,44 @@ elec_fit <- sampling(pois_age_mod, iter=1000, cores=3, chains=3,
                      data=stan_data)
 
 stan_trace(elec_fit, "age_beta")
-
+stan_diag(elec_fit)
+stan_diag(elec_fit, "stepsize")
+stan_diag(elec_fit, "divergence")
+stan_rhat(elec_fit)
 party_age <- as.matrix(elec_fit, "party_age")
+plot_matrix(party_age, "rows")
+age_beta <- as.matrix(elec_fit, "age_beta")
+plot_matrix(age_beta, "rows")
+
+vote_profile <- as.matrix(elec_fit, "vote_profile")
+vote_profile %<>% t() %>% as_tibble() %>%
+  mutate(Constit = rep(results_lab$Const_ind, stan_data$N_age),
+         Age= rep(17 + 1:N_age, rep(stan_data$N_constit, stan_data$N_age)))
+
+vote_profile %<>% gather(Sim, Profile, -Age, -Constit)
+
+ggplot(vote_profile %>% filter(Constit==1), 
+       aes(x=Age,y=Profile)) + geom_interval()
+
+ggplot(vote_profile %>% filter(Constit==2), 
+       aes(x=Age,y=Profile)) + geom_interval()
+
+net_effect <- as.matrix(elec_fit, "net_effect")
+
+net_effect %<>% t() %>% as_tibble() %>% 
+  mutate(Constituency=results_lab$Const_ind) %>%
+  gather(Sim, Effect, -Constituency)
+
+net_effect %<>% group_by(Constituency) %>% 
+  summarise(Effect=mean(Effect)) %>%
+  rename(Const_ind=Constituency) %>%
+  left_join(results_lab)
+
+ggplot(net_effect,aes(x=Effect,y=Vote)) + geom_point() +
+  geom_abline()
+
+
+
+
+
 
