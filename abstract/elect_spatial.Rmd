@@ -42,12 +42,16 @@ where $y_i$ is the total absolute vote in constituency $i$,  $v_i$ are i.i.d. er
 ![Spatial errors, model 1](../model_1.pdf)
 
 # Preliminary Results
-Comparing the vote for the Labour party with the structured errors remaining after covariants have been added to the model indentifies regions in which the Labour vote is higher than might be expected. The first model controls only for the population size of a selection of age groups. The second model includes additional various social and economic controls, include house ownership, deprivation, and degree attainment. In both models, similar areas are identified as being more likely to vote Labour than expected given the covariates models. In particular, the areas around Liverpool and South Wales are noticeable, together with regions in Kent and Suffolk.
+Comparing the vote for the Labour party with the structured errors remaining after covariants have been added to the model indentifies regions in which the Labour vote is higher than might be expected. The first model controls only for the population size of a selection of age groups. The second model accounts for additional social and economic controls, including house ownership, deprivation, and degree attainment. In both models, similar areas are identified as being more likely to vote Labour than expected given the covariates models. In particular, the areas around Liverpool and South Wales are noticeable, together with regions in Kent and Suffolk.
 
 ![Spatial errors, model 2](../model_2.pdf)
 
 # Extensions
 Future work will include modelling other parties' vote, and the joint modelling of all parties' vote and non-voting using a multinomial framework. Proper description of the uncertainties in predictive distributions together with model checking will also be carried out. Temporal differences over several elections will also be examined.
+
+# Code
+Code to reproduce the analysis is available at [https://github.com/jasonhilton/election2017](https://github.com/jasonhilton/election2017)
+
 
 # References
 
