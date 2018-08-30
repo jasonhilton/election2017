@@ -68,7 +68,7 @@ stan_data <- list(N_constit=N_constit,
 base_mod <- stan_model("stan/base_model.stan")
 
 elec_fit <- sampling(base_mod, iter=1000, data=stan_data,
-                     cores=4, chains=3)
+                     cores=3, chains=3)
 
 plot(elec_fit)
 
@@ -164,6 +164,9 @@ elec_fit <- sampling(pois_age_mod, iter=1000, cores=3, chains=3,
                      data=stan_data)
 
 stan_trace(elec_fit, "age_beta")
+stan_trace(elec_fit, "lp__")
+stan_trace(elec_fit, "log_dispersion")
+stan_trace(elec_fit, "inv_dispersion")
 stan_diag(elec_fit)
 stan_diag(elec_fit, "stepsize")
 stan_diag(elec_fit, "divergence")
@@ -201,6 +204,107 @@ ggplot(net_effect,aes(x=Effect,y=Vote)) + geom_point() +
   geom_abline()
 
 
+## Try with constraint of first element = 0
+
+cons <- get_age_conditional_cov_matrix(stan_data$age_basis)
+
+stan_data$Tau <- cons$Tau
+stan_data$inv_constraint <- cons$inv_constraint
+
+# normalise pop_data
+#stan_data$pop_data <- stan_data$pop_data/rowSums(stan_data$pop_data)
+
+elec_model <- stan_model("stan/pois_model_age_2.stan")
+
+elec_fit <- sampling(elec_model, iter=1000, cores=3, chains=3,
+                     data=stan_data)
+
+const_mean <- as.matrix(elec_fit, "const_mean")
+plot_matrix(apply(party_age, 2, function(X) plogis(X + const_mean)),"rows")
+
+net_effect %<>% mutate(Pop=rowSums(pop_data), lam=N/Pop*Effect)
+
+ggplot(net_effect, aes(x=lam, y=Vote)) + geom_point()
+
+stan_dens(elec_fit, "const_mean")
+
+
+## covariates -----------------------
+
+
+
+
+results_e_df <- results_df %>% 
+  filter(grepl("^E", ONSConstID)) %>% ## England only for now
+  select(LabVote17,
+         ConVote17, 
+         Electorate17,
+         c11HouseOwned,
+         c11EthnicityAsian,
+         c11EthnicityBlack,
+         c11Employed,
+         c11Degree,
+         c11DeprivedNone,
+         c11PassportEU,
+         c11QualNone)
+
+
+XX <- results_e_df %>% select(-LabVote17,-ConVote17) %>% mutate_all(scale) %>% as.matrix()
+
+XX <- cbind(rep(1,dim(XX)[1]), XX)
+
+stan_data <- list(XX=XX, 
+                  vote=results_e_df$LabVote17, 
+                  electorate=results_e_df$Electorate17,
+                  N=dim(XX)[1], n_covar=dim(XX)[2])
+
+elec_model <- stan_model("stan/covariate_model.stan")
+
+elec_fit <- sampling(elec_model, iter=1000, cores=3, chains=3,
+                     data=stan_data)
+
+plot(elec_fit)
+
+stan_diag(elec_fit)
+stan_diag(elec_fit, "stepsize")
+stan_diag(elec_fit, "divergence")
+stan_rhat(elec_fit)
+stan_trace(elec_fit, "lp__")
+
+beta_covar <- as.matrix(elec_fit, "beta_covar")
+eta <- as.matrix(elec_fit, "eta")
+
+plot(stan_data$vote, colMeans(exp(eta + log(stan_data$electorate))))
+
+
+## spatial ---------------------------------------------------------------------
+shape_file_name <- list.files(file.path("data", "mapping"), 
+                              pattern="*.shp")
+const <- readOGR(file.path( "data", "mapping",shape_file_name),
+                 stringsAsFactors = F)
+
+const <- const[grepl("^E",const$pcon17cd),]
+const <- const[!grepl("Buckingham",const$pcon17nm),]
+const <- const[!grepl("Buckingham",const$pcon17nm),]
+const <- const[order(const$pcon17cd),]
+const$map_id <- 1:dim(const)[1]
+
+const_nb <- poly2nb(const,snap=1e-03, row.names = const$map_id)
+plot(const)
+const_coords <- coordinates(const)
+
+const_nb <- poly2nb(const,snap=1e-03, row.names = const$map_id)
+plot(const_nb, coords=const_coords)
+nb_B <- nb2listw(const_nb, style="B", zero.policy = T)
+mat<-as(nb_B, "symmetricMatrix")
+
+ii <- mat@i
+jj <- mat@j
+
+
+stan_data$node_1 <- ii
+stan_data$node_2 <- jj
+stan_data$n_edges <- length(ii)
 
 
 

@@ -4,6 +4,9 @@ data {
   int N_constit;
   int N_basis;
   matrix[N_constit, N_age] pop_data;
+
+  matrix[N_basis, N_basis - 1] inv_constraint;
+  matrix[N_basis - 1, N_basis - 1] Tau;
   
 
   // int results_mat[N_constit,N_outcomes]; // can this be optimised
@@ -13,16 +16,22 @@ data {
   matrix[N_age, N_basis] age_basis;
 }
 
+transformed data {
+  vector[N_basis-1] zeros;
+  zeros = rep_vector(0,N_basis - 1);
+}
+
 parameters {
   // vector[N_outcomes - 1] party_beta_raw;
-  vector[N_basis - 1] d_age_beta;
+  vector[N_basis - 1] d_age_beta_raw;
   // real age_beta_1;
 
   real<lower=0> sigma_age_beta;
   vector[N_constit] const_effect;
   real<lower=0> sigma_const;
+  real const_mean;
 
-  real log_dispersion;
+  real<lower=0> inv_dispersion;
 }
 
 transformed parameters {
@@ -33,12 +42,12 @@ transformed parameters {
   vector[N_basis] age_beta;
   real dispersion;
 
-  dispersion = exp(log_dispersion);
+  dispersion = 1 / inv_dispersion;
 
-  age_beta[1] = 0;
+  //dispersion = exp(log_dispersion);
 
-  age_beta[2:N_basis] = cumulative_sum(d_age_beta * sigma_age_beta);
-
+  
+  age_beta = cumulative_sum(inv_constraint * d_age_beta_raw);
 
 
   party_age = age_basis * age_beta;
@@ -46,7 +55,7 @@ transformed parameters {
   for (c in 1:N_constit){
     for (i in 1:N_age){
       party_age_const[c][i] = inv_logit(party_age[i] + 
-                                        const_effect[c] * sigma_const);
+                                        const_mean + const_effect[c] * sigma_const);
     }  
   }
   
@@ -62,11 +71,13 @@ model {
 
   //party_beta ~ normal(0, 10);
   // age_beta_1 ~ normal(0, 1);
-  d_age_beta ~ normal(0, 1);
+  d_age_beta_raw ~ multi_normal(zeros, sigma_age_beta * Tau);
   sigma_age_beta ~ normal(0, 1);
   const_effect ~ normal(0, 1);
-  sigma_const ~ normal(0, 1);
+  const_mean ~ normal(0, 1);
+  sigma_const ~ normal(0, 5);
   
+  inv_dispersion ~ normal(0,1);
 
   for (i in 1:N){
 
@@ -77,6 +88,6 @@ model {
   }
   
 
-  // vote ~ poisson(lam);
+  //vote ~ poisson(lam);
   vote ~ neg_binomial_2(lam, dispersion);
 }
