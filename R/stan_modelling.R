@@ -8,7 +8,23 @@ library(ggplot2)
 library(splines)
 library(rstan)
 library(ggfan)
+
+
+library(maptools)
+
+library(spdep)
+#install.packages("INLA", repos=c(getOption("repos"), 
+#                                 INLA="https://inla.r-inla-download.org/R/stable"), dep=TRUE)
+library(INLA)
+
+library(tibble)
+library(haven)
+library(rgdal) 
+library(spdep)
 source("R/utility.R")
+
+
+
 
 data_path <- file.path("data/GE2017_results.dta")
 results_df <- haven::read_dta(file = data_path)
@@ -270,12 +286,15 @@ stan_diag(elec_fit, "stepsize")
 stan_diag(elec_fit, "divergence")
 stan_rhat(elec_fit)
 stan_trace(elec_fit, "lp__")
+#pairs(elec_fit, pars=c("const_sigma","sigma_phi","lp__"))
+pairs(elec_fit, pars=c("const_sigma","rho","lp__"))
+pairs(elec_fit, pars=c("phi[1]", "const_effect[1]","phi[2]", "const_effect[2]"))
 
 beta_covar <- as.matrix(elec_fit, "beta_covar")
 eta <- as.matrix(elec_fit, "eta")
 
 plot(stan_data$vote, colMeans(exp(eta + log(stan_data$electorate))))
-
+abline(0,1)
 
 ## spatial ---------------------------------------------------------------------
 shape_file_name <- list.files(file.path("data", "mapping"), 
@@ -284,7 +303,6 @@ const <- readOGR(file.path( "data", "mapping",shape_file_name),
                  stringsAsFactors = F)
 
 const <- const[grepl("^E",const$pcon17cd),]
-const <- const[!grepl("Buckingham",const$pcon17nm),]
 const <- const[!grepl("Buckingham",const$pcon17nm),]
 const <- const[order(const$pcon17cd),]
 const$map_id <- 1:dim(const)[1]
@@ -302,10 +320,31 @@ ii <- mat@i
 jj <- mat@j
 
 
-stan_data$node_1 <- ii
-stan_data$node_2 <- jj
+stan_data$node_1 <- ii + 1 
+stan_data$node_2 <- jj + 1 
 stan_data$n_edges <- length(ii)
 
+elec_model <- stan_model("stan/covariate_model_spatial.stan")
+elec_fit <- sampling(elec_model, iter=1000, cores=3, chains=3,
+                     data=stan_data)
 
+mcmc_nuts_energy(nuts_params(elec_fit))
+
+spatial_effect <- as.matrix(elec_fit, "spatial_effect")
+map_df <- fortify(const, region="map_id")
+
+results_df 
+ggplot(results_df) + 
+  geom_map(map=map_df,
+           aes(map_id=map_id,fill=`Spatial residual`),
+           colour="grey",size=0.1) + 
+  expand_limits(x=map_df$long,y=map_df$lat) +
+  coord_fixed() +
+  scale_fill_gradient2(low="black",mid="white", high="red",midpoint =1) +
+  transparent_theme +
+  theme(axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank()
+  )
 
 
