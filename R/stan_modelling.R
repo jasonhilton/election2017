@@ -25,6 +25,8 @@ library(spdep)
 source("R/utility.R")
 library(dplyr)
 
+# raster library (used by one of the geo libs) masks the dplyr select.
+select <- dplyr::select
 
 
 data_path <- file.path("data/GE2017_results.dta")
@@ -248,9 +250,13 @@ stan_dens(elec_fit, "const_mean")
 
 ## covariates -----------------------
 
+
+
 results_e_df <- results_df %>% 
   filter(grepl("^E", ONSConstID)) %>% ## England only for now
-  select(LabVote17,
+  select(ONSConstID,
+         ConstituencyName,
+         LabVote17,
          ConVote17, 
          Electorate17,
          c11HouseOwned,
@@ -260,10 +266,16 @@ results_e_df <- results_df %>%
          c11Degree,
          c11DeprivedNone,
          c11PassportEU,
-         c11QualNone)
+         c11QualNone) %>%
+  filter(!grepl("Wight", ConstituencyName)) 
+# The isle of wight is disconnected
 
 
-XX <- results_e_df %>% select(-LabVote17,-ConVote17, -Electorate17) %>%
+XX <- results_e_df %>% select(-ONSConstID,
+                              -ConstituencyName,
+                              -LabVote17,
+                              -ConVote17, 
+                              -Electorate17) %>%
   mutate_all(scale) %>% as.matrix()
 
 XX <- cbind(rep(1,dim(XX)[1]), XX)
@@ -282,14 +294,20 @@ plot(elec_fit)
 
 stan_diag(elec_fit)
 stan_diag(elec_fit, "stepsize")
+stan_diag(elec_fit, "treedepth")
 stan_diag(elec_fit, "divergence")
 stan_rhat(elec_fit)
 stan_trace(elec_fit, "lp__")
 stan_trace(elec_fit, "beta_covar")
+stan_trace(elec_fit, "intercept")
+stan_trace(elec_fit, "sigma_phi")
 #pairs(elec_fit, pars=c("const_sigma","sigma_phi","lp__"))
 pairs(elec_fit, pars=c("const_sigma","rho","lp__"))
 pairs(elec_fit, pars=c("phi[1]", "const_effect[1]","phi[2]", "const_effect[2]",
                        "phi[3]", "const_effect[3]"))
+
+pairs(elec_fit, pars=c("phi[1]","phi[2]", "phi[3]", "const_sigma"))
+stan_trace(elec_fit, pars=c("phi[1]","phi[2]", "phi[3]", "const_sigma"))
 
 beta_covar <- as.matrix(elec_fit, "beta_covar")
 eta <- as.matrix(elec_fit, "eta")
@@ -305,6 +323,7 @@ const <- readOGR(file.path( "data", "mapping",shape_file_name),
 
 const <- const[grepl("^E",const$pcon17cd),]
 const <- const[!grepl("Buckingham",const$pcon17nm),]
+const <- const[!grepl("Wight",const$pcon17nm),]
 const <- const[order(const$pcon17cd),]
 const$map_id <- 1:dim(const)[1]
 
@@ -327,6 +346,9 @@ stan_data$n_edges <- length(ii)
 
 elec_model <- stan_model("stan/covariate_model_spatial.stan")
 elec_model <- stan_model("stan/model_spatial.stan")
+dir.create("results")
+elec_fit <- sampling(elec_model, iter=1000, cores=3, chains=3,
+                     data=stan_data)
 elec_fit <- sampling(elec_model, iter=1000, cores=3, chains=3,
                      data=stan_data,
                      diagnostic_file="results/spatial_diag")
@@ -335,6 +357,10 @@ mcmc_nuts_energy(nuts_params(elec_fit))
 
 spatial_effect <- as.matrix(elec_fit, "spatial_effect")
 map_df <- fortify(const, region="map_id")
+
+results_df <- tibble(map_id=1:531,
+                     `Spatial residual` = colMeans(exp(spatial_effect)))
+
 
 ggplot(results_df) + 
   geom_map(map=map_df,
@@ -348,7 +374,7 @@ ggplot(results_df) +
         axis.text = element_blank(),
         axis.ticks = element_blank()
   )
-pairs(elec_fit, pars=c("beta_covar[1]","beta_covar[8]","beta_covar[9]"))
+  pairs(elec_fit, pars=c("beta_covar[1]","beta_covar[8]","beta_covar[9]"))
 
 read_diag <- function(i, diag_dir="results"){
   diag_df <- read.csv(file.path(diag_dir,
@@ -361,11 +387,10 @@ read_diag <- function(i, diag_dir="results"){
 diag_df <- map_dfr(1:length(elec_fit@stan_args), read_diag)
 
 upar <- diag_df %>% filter(iter>500) %>% select(beta_covar.1:rho)
-upar <- diag_df %>% filter(iter>500) %>% select(beta_covar.1:phi.532)
+upar <- diag_df %>% filter(iter>500) %>% select(beta_covar.1:phi.531)
+upar <- diag_df %>% filter(iter>500) %>% select(intercept:phi_raw.530)
 
 upar %>% summarise_all(sd) %>% gather()
-upar <- diag_df %>% filter(iter>500) %>% select(beta_covar.1:phi.532)
-
 
 masses <- get_mass_matrix(elec_fit)
 arrange(masses, Inv_mass) %>% head(20)
@@ -388,3 +413,29 @@ corrplot(all_cors[i1:i2,i1:i2], method="color",tl.pos='n')
 i1<-550
 i2<-600
 corrplot(all_cors[i1:i2,i1:i2], method="color")
+
+## exact car -----------------------------------------------------------------
+
+
+D_sparse <- rowSums(as.matrix(mat))
+invsqrt_D <- diag(1/sqrt(D_sparse))
+lambda <- eigen(invsqrt_D %*% mat %*% invsqrt_D)$values
+W_sparse = cbind(stan_data$node_1, stan_data$node_2)
+stan_data$W_sparse <- W_sparse
+stan_data$D_sparse <- D_sparse
+stan_data$lambda <- lambda
+
+elec_model <- stan_model("stan/covariate_model_spatial_exact.stan")
+
+
+elec_fit <- sampling(elec_model, iter=1000, cores=3, chains=3,
+                     data=stan_data, 
+                     diagnostic_file="results/spatial_exact")
+
+
+
+
+
+
+
+

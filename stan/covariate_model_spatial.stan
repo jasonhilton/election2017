@@ -13,15 +13,18 @@ data {
 }
 
 parameters{
-  vector[n_covar] beta_covar;
+  vector[n_covar-1] beta_covar;
+
+  real intercept;
   real<lower=0> sigma_beta;
 
   // real log_dispersion;
-  real inv_dispersion;
+  //real inv_dispersion;
 
   //vector[N] const_effect;
   real<lower=0> const_sigma;
-  vector[N] phi;
+  //vector[N] phi;
+  vector[N-1] phi_raw;
   //real<lower=0> sigma_phi;
   //real<lower=0, upper=1> rho; // proportion unstructured vs. spatially structured variance
 }
@@ -29,15 +32,19 @@ parameters{
 transformed parameters {
   vector[N] eta;
   vector[N] spatial_effect;
-  real dispersion;
+  vector[N] phi;
+
+  phi[1] = -sum(phi_raw);
+  phi[2:N] = phi_raw;
+  //real dispersion;
 
 //  dispersion = exp(log_dispersion);
-  dispersion = 1.0/inv_dispersion;
+  //dispersion = 1.0/inv_dispersion;
 
   //eta = XX * beta_covar + const_effect * const_sigma;
   //spatial_effect = sqrt(rho) * const_sigma * phi;
   spatial_effect = const_sigma * phi;
-  eta = (XX * beta_covar + spatial_effect) * 0.1;
+  eta = (intercept * 0.1 + XX[1:N, 2:n_covar] * beta_covar + spatial_effect);
 
 /*  eta = (XX * beta_covar * 0.1 + spatial_effect + 
          sqrt(1 - rho) * const_effect * const_sigma * 0.1);
@@ -51,14 +58,14 @@ model {
 
   //const_effect ~ normal(0, 1);
   const_sigma ~ normal(0, 5);
-
-  inv_dispersion ~ normal(0, 1);
+  intercept ~ normal(0,10);
+  //inv_dispersion ~ normal(0, 1);
 
   // soft sum-to-zero constraint on phi)
   sum(phi) ~ normal(0, 0.001 * N);  // equivalent to mean(phi) ~ normal(0,0.001)
 
   sigma_beta ~ normal(0, 5);
   //sigma_phi ~ normal(0, 5);
-  vote ~ neg_binomial_2_log(eta + log(electorate), dispersion);
-  //vote ~ poisson_log(eta + log(electorate));
+  //vote ~ neg_binomial_2_log(eta + log(electorate), dispersion);
+  vote ~ poisson_log(eta + log(electorate));
 }
