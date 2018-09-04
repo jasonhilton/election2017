@@ -147,6 +147,39 @@ get_constraint_transformation_matrix <- function(constraint, con_ind){
 }
 
 
+get_mass_matrix <- function(fert_fit){
+  split_adapt_strings <- stringr::str_split(rstan::get_adaptation_info(fert_fit), "#")
+  mass_matrices <- map(split_adapt_strings, 
+                       function(x) stringr::str_split(x[5], ", ") %>% 
+                         unlist() %>% (function(y) gsub("\n", "",y)) %>% 
+                         as.numeric())
+  mass_mat <- do.call(cbind, mass_matrices) %>% as_tibble()
+  par_names <- names(fert_fit@sim$samples[[1]])[1:dim(mass_mat)[1]]
+  mass_mat <- cbind(tibble(parameter=par_names), mass_mat)
+  mass_mat %<>% gather(Chain, Inv_mass, -parameter) 
+  mass_mat %<>% mutate(Chain=as.numeric(gsub(pattern="V", "",Chain)))
+  
+  return(mass_mat)
+}
+
+get_num_parameters <- function(fert_fit){
+  split_adapt_strings <- stringr::str_split(rstan::get_adaptation_info(fert_fit), "#")
+  n_pars <- stringr::str_split(split_adapt_strings[[1]][5], ", ") %>% 
+    unlist() %>%
+    length()
+  return(n_pars)
+}
+
+
+get_stepsizes <- function(fert_fit){
+  split_adapt_strings <- stringr::str_split(rstan::get_adaptation_info(fert_fit), "#")
+  stepsize <- map_dbl(split_adapt_strings, 
+                      function(x) as.numeric(stringr::str_extract(x[3],"[0-9]+\\.[0-9]+")))
+  return(stepsize)
+}
+
+
+
 
 
 
