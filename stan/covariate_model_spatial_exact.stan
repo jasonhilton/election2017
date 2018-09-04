@@ -56,13 +56,18 @@ data {
 
 
 }
-
+transformed data {
+  vector[N] log_electorate;
+  log_electorate = log(electorate);
+}
 
 parameters{
   vector[n_covar] beta_covar;
   real<lower=0> sigma_beta;
 
-  //real log_dispersion;
+  real log_dispersion;
+
+
 
   
   real<lower=0> const_sigma;
@@ -75,15 +80,12 @@ transformed parameters {
   vector[N] eta;
   //vector[N] spatial_effect;
   real tau_phi;
-  vector[N] log_electorate;
-
-  log_electorate = log(electorate);
-
+  
+  real dispersion;
 
   tau_phi = 1 / const_sigma;
-  //real dispersion;
 
-  //dispersion = exp(log_dispersion);
+  dispersion = exp(log_dispersion);
 
   //eta = XX * beta_covar + const_effect * const_sigma;
   
@@ -108,6 +110,6 @@ model {
   const_sigma ~ normal(0, 5);
 
   //sigma_phi ~ normal(0, 5);
-  //vote ~ neg_binomial_2_log(eta + log(electorate), dispersion);
-  vote ~ poisson_log(eta + log_electorate);
+  vote ~ neg_binomial_2_log(eta + log(electorate), dispersion);
+  // vote ~ poisson_log(eta + log_electorate);
 }

@@ -12,19 +12,25 @@ data {
 
 }
 
+transformed data {
+  vector[N] log_electorate;
+
+  log_electorate = log(electorate);
+}
+
 parameters{
   vector[n_covar-1] beta_covar;
 
   real intercept;
   real<lower=0> sigma_beta;
 
-  // real log_dispersion;
+  real log_dispersion;
   //real inv_dispersion;
 
   //vector[N] const_effect;
   real<lower=0> const_sigma;
-  //vector[N] phi;
-  vector[N-1] phi_raw;
+  vector[N] phi;
+  //vector[N-1] phi_raw;
   //real<lower=0> sigma_phi;
   //real<lower=0, upper=1> rho; // proportion unstructured vs. spatially structured variance
 }
@@ -32,13 +38,14 @@ parameters{
 transformed parameters {
   vector[N] eta;
   vector[N] spatial_effect;
-  vector[N] phi;
+  //vector[N] phi;
+   real dispersion;
 
-  phi[1] = -sum(phi_raw);
-  phi[2:N] = phi_raw;
-  //real dispersion;
+  // phi[1] = -sum(phi_raw);
+  // phi[2:N] = phi_raw;
+ 
 
-//  dispersion = exp(log_dispersion);
+  dispersion = exp(log_dispersion);
   //dispersion = 1.0/inv_dispersion;
 
   //eta = XX * beta_covar + const_effect * const_sigma;
@@ -66,6 +73,6 @@ model {
 
   sigma_beta ~ normal(0, 5);
   //sigma_phi ~ normal(0, 5);
-  //vote ~ neg_binomial_2_log(eta + log(electorate), dispersion);
-  vote ~ poisson_log(eta + log(electorate));
+  vote ~ neg_binomial_2_log(eta + log_electorate, dispersion);
+  //vote ~ poisson_log(eta + log(electorate));
 }

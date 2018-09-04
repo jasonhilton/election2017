@@ -344,6 +344,7 @@ stan_data$node_1 <- ii + 1
 stan_data$node_2 <- jj + 1 
 stan_data$n_edges <- length(ii)
 
+
 elec_model <- stan_model("stan/covariate_model_spatial.stan")
 elec_model <- stan_model("stan/model_spatial.stan")
 dir.create("results")
@@ -374,7 +375,9 @@ ggplot(results_df) +
         axis.text = element_blank(),
         axis.ticks = element_blank()
   )
-  pairs(elec_fit, pars=c("beta_covar[1]","beta_covar[8]","beta_covar[9]"))
+
+pairs(elec_fit, pars=c("intercept","beta_covar[1]","beta_covar[6]","beta_covar[8]"))
+pairs(elec_fit, pars=c("log_dispersion", "const_sigma", "lp__"))
 
 read_diag <- function(i, diag_dir="results"){
   diag_df <- read.csv(file.path(diag_dir,
@@ -415,8 +418,9 @@ i2<-600
 corrplot(all_cors[i1:i2,i1:i2], method="color")
 
 ## exact car -----------------------------------------------------------------
-
-
+# exact car needs no intercept
+stan_data$XX <- stan_data$XX[,2:stan_data$n_covar]
+stan_data$n_covar <- stan_data$n_covar - 1
 D_sparse <- rowSums(as.matrix(mat))
 invsqrt_D <- diag(1/sqrt(D_sparse))
 lambda <- eigen(invsqrt_D %*% mat %*% invsqrt_D)$values
@@ -431,11 +435,138 @@ elec_model <- stan_model("stan/covariate_model_spatial_exact.stan")
 elec_fit <- sampling(elec_model, iter=1000, cores=3, chains=3,
                      data=stan_data, 
                      diagnostic_file="results/spatial_exact")
+# alpha is virtually 1
+stan_dens(elec_fit, "alpha")
+
+### -- multivariate-------------------------------------------------------------
+
+results_df <- haven::read_dta(file = data_path)
+
+results_df %<>% filter(ConstituencyName!="Buckingham")
+results_df %<>% arrange(ONSConstID) %>% 
+  mutate(map_id = 1:631)
+
+
+results_e_df <- results_df %>%
+  filter(grepl("^E", ONSConstID)) %>% ## England only for now
+  select(ONSConstID,
+         ConstituencyName,
+         LabVote17,
+         ConVote17, 
+         LDVote17,
+         UKIPVote17,
+         GreenVote17,
+         TotalVote17,
+         Electorate17,
+         c11HouseOwned,
+         c11EthnicityAsian,
+         c11EthnicityBlack,
+         c11Employed,
+         c11Degree,
+         c11DeprivedNone,
+         c11PassportEU,
+         c11QualNone) %>%
+  filter(!grepl("Wight", ConstituencyName)) 
+# The isle of wight is disconnected
+
+
+XX <- results_e_df %>% select(starts_with("c11")) %>%
+  mutate_all(scale) %>% as.matrix()
+
+XX <- cbind(rep(1,dim(XX)[1]), XX)
+
+results_e_df %<>%
+  mutate_at(vars(matches("Vote17$")), function(x) ifelse(is.na(x), 0, x)) %>%
+  mutate(OtherVote17 = TotalVote17 - LabVote17 - ConVote17 - LDVote17,
+         NoVote17 = Electorate17 - TotalVote17)
+
+vote <- results_e_df %>% select(LabVote17, ConVote17, 
+                              LDVote17, OtherVote17, NoVote17) %>%
+  as.matrix()
+
+stan_data <- list(XX=XX, 
+                  vote=vote,
+                  n_parties=dim(vote)[2],
+                  electorate=results_e_df$Electorate17,
+                  N=dim(XX)[1], 
+                  n_covar=dim(XX)[2])
+
+stan_data$node_1 <- ii + 1
+stan_data$node_2 <- jj + 1 
+stan_data$n_edges <- length(ii)
+
+elec_model <- stan_model("stan/covariate_model_spatial_multi.stan")
+
+
+elec_fit <- sampling(elec_model, iter=1000, cores=3, chains=3,
+                     data=stan_data)
+
+
+spat <- spatial_effect %>% t() %>% as_tibble() %>% 
+  mutate(const_id =rep(1:stan_data$N,stan_data$n_parties-1), 
+         party=rep(c("Lab", "Con", "LD", "Other"), rep(stan_data$N, 4)))
+
+spat %<>% gather(Sim, Spatial_effect, -party, -const_id) %>% 
+  group_by(const_id, party) %>% 
+  summarise(Spatial_effect=mean(Spatial_effect))
+
+spat_lab <- spat %>% filter(party=="Lab")
 
 
 
 
+ggplot(spat_lab) + 
+  geom_map(map=map_df,
+           aes(map_id=const_id,fill=Spatial_effect),
+           colour="grey",size=0.1) + 
+  expand_limits(x=map_df$long,y=map_df$lat) +
+  coord_fixed() +
+  scale_fill_gradient2(low="black",mid="white", high="red") +
+  transparent_theme +
+  theme(axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank()
+  )
 
 
+spat_con <- spat %>% filter(party=="Con")
+ggplot(spat_con) + 
+  geom_map(map=map_df,
+           aes(map_id=const_id,fill=Spatial_effect),
+           colour="grey",size=0.1) + 
+  expand_limits(x=map_df$long,y=map_df$lat) +
+  coord_fixed() +
+  scale_fill_gradient2(low="black",mid="white", high="blue") +
+  transparent_theme +
+  theme(axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank()
+  )
 
+spat_lib <- spat %>% filter(party=="LD")
+ggplot(spat_lib) + 
+  geom_map(map=map_df,
+           aes(map_id=const_id,fill=Spatial_effect),
+           colour="grey",size=0.1) + 
+  expand_limits(x=map_df$long,y=map_df$lat) +
+  coord_fixed() +
+  scale_fill_gradient2(low="black",mid="white", high="orange") +
+  transparent_theme +
+  theme(axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank()
+  )
 
+spat_other <- spat %>% filter(party=="Other")
+ggplot(spat_other) + 
+  geom_map(map=map_df,
+           aes(map_id=const_id,fill=Spatial_effect),
+           colour="grey",size=0.1) + 
+  expand_limits(x=map_df$long,y=map_df$lat) +
+  coord_fixed() +
+  scale_fill_gradient2(low="black",mid="white", high="purple") +
+  transparent_theme +
+  theme(axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank()
+  )

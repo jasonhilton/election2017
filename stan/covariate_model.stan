@@ -36,4 +36,5 @@ model {
 
   sigma_beta ~ normal(0, 5);
   vote ~ neg_binomial_2_log(eta + log(electorate) , dispersion);
+  //vote ~ poisson_log(eta + log(electorate));
 }
