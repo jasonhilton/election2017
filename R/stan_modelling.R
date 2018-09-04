@@ -1,14 +1,14 @@
 # starting with nonspatial model. 
 
 library(tidyr)
-library(dplyr)
+
 library(magrittr)
 library(purrr)
 library(ggplot2)
 library(splines)
 library(rstan)
 library(ggfan)
-
+library(raster)
 
 library(maptools)
 
@@ -22,7 +22,7 @@ library(haven)
 library(rgdal) 
 library(spdep)
 source("R/utility.R")
-
+library(dplyr)
 
 
 
@@ -247,9 +247,6 @@ stan_dens(elec_fit, "const_mean")
 
 ## covariates -----------------------
 
-
-
-
 results_e_df <- results_df %>% 
   filter(grepl("^E", ONSConstID)) %>% ## England only for now
   select(LabVote17,
@@ -265,7 +262,8 @@ results_e_df <- results_df %>%
          c11QualNone)
 
 
-XX <- results_e_df %>% select(-LabVote17,-ConVote17) %>% mutate_all(scale) %>% as.matrix()
+XX <- results_e_df %>% select(-LabVote17,-ConVote17, -Electorate17) %>%
+  mutate_all(scale) %>% as.matrix()
 
 XX <- cbind(rep(1,dim(XX)[1]), XX)
 
@@ -286,8 +284,10 @@ stan_diag(elec_fit, "stepsize")
 stan_diag(elec_fit, "divergence")
 stan_rhat(elec_fit)
 stan_trace(elec_fit, "lp__")
+stan_trace(elec_fit, "beta_covar")
 #pairs(elec_fit, pars=c("const_sigma","sigma_phi","lp__"))
 pairs(elec_fit, pars=c("const_sigma","rho","lp__"))
+pairs(elec_fit, pars=c("const_sigma","lp__"))
 pairs(elec_fit, pars=c("phi[1]", "const_effect[1]","phi[2]", "const_effect[2]"))
 
 beta_covar <- as.matrix(elec_fit, "beta_covar")
@@ -320,20 +320,21 @@ ii <- mat@i
 jj <- mat@j
 
 
-stan_data$node_1 <- ii + 1 
+stan_data$node_1 <- ii + 1
 stan_data$node_2 <- jj + 1 
 stan_data$n_edges <- length(ii)
 
 elec_model <- stan_model("stan/covariate_model_spatial.stan")
 elec_fit <- sampling(elec_model, iter=1000, cores=3, chains=3,
-                     data=stan_data)
+                     data=stan_data,
+                     diagnostic_file="results/spatial_diag")
 
+  library(bayesplot)
 mcmc_nuts_energy(nuts_params(elec_fit))
 
 spatial_effect <- as.matrix(elec_fit, "spatial_effect")
 map_df <- fortify(const, region="map_id")
 
-results_df 
 ggplot(results_df) + 
   geom_map(map=map_df,
            aes(map_id=map_id,fill=`Spatial residual`),
@@ -346,5 +347,43 @@ ggplot(results_df) +
         axis.text = element_blank(),
         axis.ticks = element_blank()
   )
+pairs(elec_fit, pars=c("beta_covar[1]","beta_covar[8]","beta_covar[9]"))
+
+read_diag <- function(i, diag_dir="results"){
+  diag_df <- read.csv(file.path(diag_dir,
+                                paste0("spatial_diag_",i,".csv")),
+                      comment.char="#") %>% as_tibble() %>%
+    mutate(iter=1:n(), Chain=i)
+  return(diag_df)
+}
+
+diag_df <- map_dfr(1:length(elec_fit@stan_args), read_diag)
+
+upar <- diag_df %>% filter(iter>500) %>% select(beta_covar.1:rho)
+upar <- diag_df %>% filter(iter>500) %>% select(beta_covar.1:phi.532)
+
+upar %>% summarise_all(sd) %>% gather()
+upar <- diag_df %>% filter(iter>500) %>% select(beta_covar.1:phi.532)
 
 
+masses <- get_mass_matrix(elec_fit)
+arrange(masses, Inv_mass) %>% head(20)
+
+all_cors <- cor(diag_df %>% filter(iter>500) %>% select(beta_covar.1:rho))
+
+ggplot(diag_df %>% filter(iter>500),
+       aes(x=const_sigma,y=log_dispersion,
+                 colour=lp__)) + geom_point()
+
+ggplot(diag_df %>% filter(iter>500),
+       aes(x=const_sigma,y=inv_dispersion,
+           colour=lp__)) + geom_point()
+
+
+library(corrplot)
+i1<-1
+i2<-100
+corrplot(all_cors[i1:i2,i1:i2], method="color",tl.pos='n')
+i1<-550
+i2<-600
+corrplot(all_cors[i1:i2,i1:i2], method="color")
