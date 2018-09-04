@@ -8,7 +8,7 @@ library(ggplot2)
 library(splines)
 library(rstan)
 library(ggfan)
-
+library(bayesplot)
 
 library(maptools)
 
@@ -288,7 +288,8 @@ stan_rhat(elec_fit)
 stan_trace(elec_fit, "lp__")
 #pairs(elec_fit, pars=c("const_sigma","sigma_phi","lp__"))
 pairs(elec_fit, pars=c("const_sigma","rho","lp__"))
-pairs(elec_fit, pars=c("phi[1]", "const_effect[1]","phi[2]", "const_effect[2]"))
+pairs(elec_fit, pars=c("phi[1]", "const_effect[1]","phi[2]", "const_effect[2]",
+                       "phi[3]", "const_effect[3]"))
 
 beta_covar <- as.matrix(elec_fit, "beta_covar")
 eta <- as.matrix(elec_fit, "eta")
@@ -325,6 +326,7 @@ stan_data$node_2 <- jj + 1
 stan_data$n_edges <- length(ii)
 
 elec_model <- stan_model("stan/covariate_model_spatial.stan")
+elec_model <- stan_model("stan/model_spatial.stan")
 elec_fit <- sampling(elec_model, iter=1000, cores=3, chains=3,
                      data=stan_data)
 
