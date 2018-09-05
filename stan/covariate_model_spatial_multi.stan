@@ -77,7 +77,7 @@ model {
   //inv_dispersion ~ normal(0, 1);
 
   // soft sum-to-zero constraint on phi)
-    // equivalent to mean(phi) ~ normal(0,0.001)
+  // equivalent to mean(phi) ~ normal(0,0.001)
 
   sigma_beta ~ normal(0, 5);
   //sigma_phi ~ normal(0, 5);

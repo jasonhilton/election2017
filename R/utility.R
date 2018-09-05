@@ -179,7 +179,13 @@ get_stepsizes <- function(fert_fit){
 }
 
 
-
+read_diag <- function(i, file_name, diag_dir="results"){
+  diag_df <- read.csv(file.path(diag_dir,
+                                paste0(file_name, "_", i, ".csv")),
+                      comment.char="#") %>% as_tibble() %>%
+    mutate(iter=1:n(), Chain=i)
+  return(diag_df)
+}
 
 
 

@@ -250,9 +250,7 @@ stan_dens(elec_fit, "const_mean")
 
 ## covariates -----------------------
 
-
-
-results_e_df <- results_df %>% 
+results_e_df <- results_df %>%
   filter(grepl("^E", ONSConstID)) %>% ## England only for now
   select(ONSConstID,
          ConstituencyName,
@@ -401,7 +399,7 @@ arrange(masses, Inv_mass) %>% head(20)
 all_cors <- cor(diag_df %>% filter(iter>500) %>% select(beta_covar.1:rho))
 
 ggplot(diag_df %>% filter(iter>500),
-       aes(x=const_sigma,y=log_dispersion,
+       aes(x=const_sigma,y=sigma_phi,
                  colour=lp__)) + geom_point()
 
 ggplot(diag_df %>% filter(iter>500),

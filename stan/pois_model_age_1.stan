@@ -1,12 +1,8 @@
 data {
   int N_age;
   int N;
-  int N_constit;
   int N_basis;
-  matrix[N_constit, N_age] pop_data;
-  
-
-  // int results_mat[N_constit,N_outcomes]; // can this be optimised
+  matrix[N, N_age] pop_data;
   int vote[N];
   int electorate[N];
 
@@ -14,69 +10,56 @@ data {
 }
 
 parameters {
-  // vector[N_outcomes - 1] party_beta_raw;
-  vector[N_basis - 1] d_age_beta;
-  // real age_beta_1;
+  //vector[N_basis - 1] d_age_beta;
+  //real<upper=0> age_beta_1;
 
+
+  vector[N_basis] age_beta;
   real<lower=0> sigma_age_beta;
-  vector[N_constit] const_effect;
-  real<lower=0> sigma_const;
 
-  real log_dispersion;
+  // vector[N] const_effect;
+  // real<lower=0> sigma_const;
+
+
+  // real log_dispersion;
 }
 
 transformed parameters {
-  vector[N_age] party_age;
-  vector[N_age] party_age_const[N_constit];
-  matrix[N_constit, N_age] vote_profile;
-  vector[N_constit] net_effect;
-  vector[N_basis] age_beta;
-  real dispersion;
+  // real dispersion;
+  // vector[N_basis] age_beta;
+  vector[N_age] smooth_age;
 
-  dispersion = exp(log_dispersion);
+  matrix[N, N_age] log_vote_x;
+  vector[N] lam;
+  // vector[N] random_effect;
 
-  age_beta[1] = 0;
-
-  age_beta[2:N_basis] = cumulative_sum(d_age_beta * sigma_age_beta);
-
-
-
-  party_age = age_basis * age_beta;
-
-  for (c in 1:N_constit){
-    for (i in 1:N_age){
-      party_age_const[c][i] = inv_logit(party_age[i] + 
-                                        const_effect[c] * sigma_const);
-    }  
-  }
+  // random_effect = sigma_const * const_effect;
+  // dispersion = exp(log_dispersion);
+  
   
 
+  smooth_age = age_basis * age_beta;
+
+
+
   for (i in 1:N){
-    vote_profile[i] = pop_data[i] .* party_age_const[i]';
-    net_effect[i] = sum(vote_profile[i]);
+    // log_vote_x[i] = random_effect[i] + smooth_age' + log(pop_data[i]);  
+    log_vote_x[i] = smooth_age' + log(pop_data[i]);  
+    lam[i] = log_sum_exp(log_vote_x[i]);
   }
+  
 }
 
 model {
-  vector[N] lam;
+  
 
-  //party_beta ~ normal(0, 10);
-  // age_beta_1 ~ normal(0, 1);
-  d_age_beta ~ normal(0, 1);
+  age_beta[2:N_basis] ~ normal(age_beta[1:(N_basis - 1)],
+                               sigma_age_beta * 0.1);
+
+
   sigma_age_beta ~ normal(0, 1);
-  const_effect ~ normal(0, 1);
-  sigma_const ~ normal(0, 1);
-  
+  // const_effect ~ normal(0, 1);
 
-  for (i in 1:N){
-
-    lam[i] = ((electorate[i] /
-               sum(pop_data[i])) *
-              net_effect[i]);
-              
-  }
-  
-
-  // vote ~ poisson(lam);
-  vote ~ neg_binomial_2(lam, dispersion);
+  //vote ~ neg_binomial_2_log(lam, dispersion);
+  vote ~ poisson_log(lam);
 }
