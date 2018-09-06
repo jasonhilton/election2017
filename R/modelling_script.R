@@ -117,12 +117,12 @@ stan_data <- list(XX=XX,
 
 elec_model <- stan_model("stan/covariate_model_spatial.stan")
 
-elec_fit <- sampling(elec_model, 
+elec_fit <- sampling(elec_model,
                      data=stan_data,
                      iter=1000, 
                      cores=3,
-                     chains=3,
-                     diagnostic_file="results/pois")
+                     chains=3)
+#                     diagnostic_file="results/pois")
 
 
 # General diagnostics --------------------------------------------------
@@ -266,4 +266,47 @@ stan_trace(elec_fit, "age_beta")
 
 smooth_age <- as.matrix(elec_fit, "smooth_age")
 log_vote_x <- as.matrix(elec_fit, "log_vote_x")
+
+
+## Parametric function of age --------------------------------------------------
+
+age_x <- scale(1:stan_data$N_age)
+age_x2 <- scale(1:stan_data$N_age)**2
+stan_data$age_X  <- cbind(rep(1, stan_data$N_age),age_x, age_x2)
+
+
+elec_model <- stan_model("stan/pois_model_age_para.stan")
+
+elec_fit <- sampling(elec_model,
+                     data=stan_data,
+                     iter=1000, 
+                     cores=3,
+                     chains=3)
+
+stan_trace(elec_fit, "beta_age")
+stan_trace(elec_fit, "sigma_beta")
+stan_trace(elec_fit, "log_dispersion")
+stan_trace(elec_fit, "sigma_intercept")
+pairs(elec_fit, pars=c("sigma_intercept", "log_dispersion"))
+stan_trace(elec_fit, pars=c("sigma_intercept", "log_dispersion"))
+stan_trace(elec_fit, pars=c("intercept_age[1]", "intercept_age[2]"))
+
+log_vote_prop <-as.matrix(elec_fit, "log_vote_prop")
+
+log_vote_prop <- get_2d_stan_df(elec_fit, "log_vote_prop", index_1_name="Const_id", 
+                             index_2_name="Age",
+                             conversion_2_func = function(x) x + 17,
+                               value_name="Log_vote")
+
+ggplot(log_vote_prop %>% filter(Const_id ==232),
+       aes(x=Age,y=Log_vote)) + geom_fan() + theme_bw() + scale_fill_viridis_c()
+
+ggplot(log_vote_prop %>% filter(Const_id %in% c(2,3)),
+       aes(x=Age,y=exp(Log_vote),group=Const_id,colour=as.factor(Const_id))) + 
+  geom_interval() + theme_bw() + scale_fill_viridis_c()
+ 
+lam <- as.matrix(elec_fit, "lam")
+
+plot(colMeans(exp(lam)), stan_data$vote)
+abline(0,1)
 

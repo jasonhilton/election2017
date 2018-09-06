@@ -187,6 +187,42 @@ read_diag <- function(i, file_name, diag_dir="results"){
   return(diag_df)
 }
 
+get_2d_stan_df  <- function(model_fit, param_name,
+                            index_1_name= "Index_1", 
+                            index_2_name= "Index_2",
+                            conversion_1_func=identity,
+                            conversion_2_func=identity,
+                            value_name ="Value"){
+  if(class(model_fit)!="stanfit"){
+    stop("model_fit must be of class `stanfit`")
+  }
+  par_mat <- as.matrix(model_fit, param_name)
+  
+  par_names <- colnames(par_mat)
+  
+  if(max(stringr::str_count(par_names,"\\,")) > 1){
+    stop("Parameter has more than 2 dimensions")
+  }
+  if(min(stringr::str_count(par_names, "\\,")) <1 ){
+    stop("Parameter has fewer than 2 dimensions")
+  }
+  ind_1 <- stringr::str_extract_all(par_names,
+                                    # match all numbers followed by a comma
+                                    "[0-9]+(?=\\,)",
+                                    simplify = T) %>% 
+    as.numeric()
+  ind_2 <- stringr::str_extract_all(par_names,
+                                    # match all numbers preceded by a comma
+                                    "(?<=\\,)[0-9]+",
+                                    simplify = T) %>% 
+    as.numeric()
+  
+  par_df <- par_mat %>% t() %>% tibble::as_tibble() %>%
+    mutate(!!index_1_name:=conversion_1_func(ind_1),
+           !!index_2_name:=conversion_2_func(ind_2)) %>%
+    gather(Sim, !!value_name, -!!index_1_name, -!!index_2_name)
+  return(par_df)
+}
 
 
 
